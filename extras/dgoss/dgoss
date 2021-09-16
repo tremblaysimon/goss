@@ -13,6 +13,20 @@ error() {
     exit 1;
 }
 
+is_entrypoint_empty() {
+    info "Verify if there an ENTRYPOINT in the Docker image"
+    local image_id=$1
+
+    entrypoint=$(docker inspect -f '{{.Config.Entrypoint}}' ${image_id})
+
+    if [ "$entrypoint" == "[]" ];
+    then
+        return 0;
+    else
+        return 1;
+    fi
+}
+
 cleanup() {
     set +e
     { kill "$log_pid" && wait "$log_pid"; } 2> /dev/null
@@ -39,7 +53,13 @@ run(){
     case "$GOSS_FILES_STRATEGY" in
       mount)
         info "Starting docker container"
-        id=$(docker run -d -v "$tmp_dir:/goss:z" "${@:2}")
+        entrypoint_parameters=""
+        if is_entrypoint_empty "${@:2}";
+        then
+            info "Using default -it --entrypoint /bin/sh"
+            entrypoint_parameters="-it --entrypoint /bin/sh"
+        fi
+        id=$(docker run -d $entrypoint_parameters -v "$tmp_dir:/goss:z" "${@:2}")
         ;;
       cp)
         info "Creating docker container"
